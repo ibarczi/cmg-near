@@ -1,0 +1,94 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.App {
+  text-align: center;
+  font-size: calc(9px + 0.5vmin);
+  width: 96%;
+  margin: auto;
+}
+
+.appHeader {
+  width: 100%;
+  background: rgba(216, 212, 89, .5);
+  align-items: center;
+  justify-content: center;
+  color: rgb(32, 32, 102);
+  padding: 1vmin;
+}
+
+.appStatus { /* not used */
+  width: 100%;
+  background: rgba(196, 217, 161, .5);
+  align-items: center;
+  justify-content: center;
+  color: rgb(23, 61, 16);
+  padding: 1vmin;
+}
+
+.appContent {
+  width: 100%;
+  background: rgba(200, 200, 200, .5);
+  align-items: center;
+  justify-content: center;
+  color: rgb(26, 75, 26);
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+.contentItem {
+  width: 240px;
+  display: inline-block;
+  text-align: left;
+}
+
+.contentItem img { height: 160px; }
+.contentItem em { font-style: normal; font-weight: 700; }
+
+.appContentRec {
+  width: 96%;
+  background: #eee;
+}
+.appContentRec > div { display: inline-block; vertical-align: middle; padding: 6px; border-radius: 4px; }
+.appContentRecLeft { width: 350px; color: #fff; background: #444; text-align: left; font-size: 18px;}
+.appContentRecMid { width: 720px; color: #444; }
+.appContentRecMid.nobids {opacity: .2; }
+.appContentRecRight { width: 290px; color: #44f; }
+
+.shBox {
+  margin: 16px auto; padding: 8px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  box-shadow: 1px 1px 2px .5px #aaa;
+}
+.shBox.bidPt { display: inline-block; 
+  margin: 0 2px; padding: 4px; font-size: 16px; background: #fff; }
+.bidPt.sum { background: #fda; font-weight: 600; font-style: italic; padding: 4px; 
+  text-align: left; vertical-align: top;}
+.bidPt.sum .token { font-style: normal; }
+.bidPt.sum .own { color: #A00; }
+.bidPt .pt {color: #888;}
+.bidButton { width: 120px; cursor: pointer;
+  font-size: 16px; font-weight: 500; background: #ccc; border: 1px solid #aaa;}
+.nftFrame {font-size: 16px;}
+.nftFrame img {width: 200px;}
+.nftFrame img.s90 {width: 400px;}
+.nftHead {margin-top: 6px; font-weight: 600;}
+.val.zero {opacity: .5; }
+
+
+button {margin: 0px 16px 0px 8px;}
+p { padding: 0px 6px; margin: 6px 0; }

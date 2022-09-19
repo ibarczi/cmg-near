@@ -1,0 +1,13 @@
+[package]
+name = "nft-z2h"
+version = "1.1.0"
+authors = ["Sasi <setalosas@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = "4.0.0"
+near-contract-standards = "4.0.0"
+serde = "1.0.0"

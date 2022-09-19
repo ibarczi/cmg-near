@@ -1,0 +1,12 @@
+[package]
+name = "coto"
+version = "1.0.0"
+authors = ["Sasi <setalosas@gmail.com>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = "4.0.0"
+near-contract-standards = "4.0.0"

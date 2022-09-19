@@ -1,0 +1,15 @@
+#!/bin/bash
+near state $CID | grep -E 'Account|formattedAmount:'
+near state $FTID | grep -E 'Account|formattedAmount:'
+near state setalosas.testnet | grep -E 'Account|formattedAmount:'
+# near state kremilek.testnet | grep -E 'Account|formattedAmount:'
+near state krtek.testnet | grep -E 'Account|formattedAmount:'
+# near state vochomurka.testnet | grep -E 'Account|formattedAmount:'
+# near state helmut.testnet | grep -E 'Account|formattedAmount:'
+# near state gertrude.testnet | grep -E 'Account|formattedAmount:'
+
+near view $FTID ft_balance_of '{"account_id": "setalosas.testnet"}'
+near view $FTID ft_balance_of '{"account_id": "krtek.testnet"}'
+near view $FTID ft_balance_of '{"account_id": "kremilek.testnet"}'
+near view $FTID ft_balance_of '{"account_id": "botticelli.testnet"}'
+near view $FTID ft_balance_of '{"account_id": "'$CID'"}'
