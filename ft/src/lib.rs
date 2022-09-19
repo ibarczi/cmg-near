@@ -148,7 +148,7 @@ impl Contract {
     // let amount: Balance = amount.into();
     // let sender_id = env::predecessor_account_id();
     let sender_id = AccountId::new_unchecked("setalosas.testnet".to_string());
-    self.token.ft_resolve_transfer(&sender_id, receiver_id, amount);
+    self.token.ft_resolve_transfer(sender_id, receiver_id, amount);
   }
 
   pub fn cross_call_test(&mut self, msg: String) {
