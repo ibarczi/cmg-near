@@ -1,5 +1,5 @@
 .ONESHELL:
-.PHONY: lint test bench
+.PHONY: lint test
 
 clean:
 	@cargo clean
