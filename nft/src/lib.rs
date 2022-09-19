@@ -60,13 +60,13 @@ pub trait ExtSelf {
 
 const BIDPT: usize = 10;
 const E24: u128 = 1_000_000_000_000_000_000_000_000;
-const TREASURY_ID: &str = &"botticelli.testnet";
+const TREASURY_ID: &str = "botticelli.testnet";
 const defaultTokenMetadata: TokenMetadata = TokenMetadata {
     title: None,
     description: None,
     extra: None,
     media: None,
-    copies: Some(1 as u64),
+    copies: Some(1),
     media_hash: None,
     issued_at: None,
     expires_at: None,
@@ -112,7 +112,7 @@ pub struct ContentKey {
     timestamp: u64,
 }
 
-#[derive(Debug, BorshDeserialize, BorshSerialize, serde::Serialize)]
+#[derive(Debug, Default, BorshDeserialize, BorshSerialize, serde::Serialize)]
 pub struct ContentRec {
     //.rem: ContentRec___________________________
     creatorId: String,
@@ -168,10 +168,10 @@ impl Contract {
         self.cnt
     }
     pub fn inc_cnt(&mut self) {
-        self.cnt = self.cnt + 1;
+        self.cnt += 1;
     }
     pub fn add_cnt(&mut self, cnt: u32) {
-        self.cnt = self.cnt + cnt;
+        self.cnt += cnt;
     }
 
     //.rem  original nft placeholder stuff modified for 2x nfts
@@ -227,7 +227,7 @@ impl Contract {
             ),
             licenceTokens: NonFungibleToken::new(
                 StorageKey::NonFungibleToken,
-                owner_id.clone(),
+                owner_id,
                 Some(StorageKey::TokenMetadata),
                 Some(StorageKey::Enumeration),
                 Some(StorageKey::Approval),
@@ -238,7 +238,7 @@ impl Contract {
             licenceMetadata: LazyOption::new(StorageKey::Metadata, Some(&metadata)),
             cnt: 0,
             contents: HashMap::new(),
-            emptyContentRec: Self::create_empty_content_rec(),
+            emptyContentRec: ContentRec::default(),
             lock: 0,
         }
     }
@@ -310,16 +310,17 @@ impl Contract {
     fn _showContentList(&self, withBidding: bool) {
         log!("{FgYellow}Current content list:{}", R);
         for (contentKeyKey, contentRec) in &self.contents {
-            self.showContentInfo("Content", &contentKeyKey, &contentRec);
+            self.showContentInfo("Content", contentKeyKey, contentRec);
             if withBidding {
                 if contentRec.tokenId > 0 {
-                    let scoutList = self.get_nft_owners_for(contentRec.tokensArr.clone());
-                    for i in 0..BIDPT {
+                    let scoutList = self.get_nft_owners_for(contentRec.tokensArr);
+
+                    for (i, scout) in scoutList.iter().enumerate() {
                         log!(
                             "{FgT}Slot[{i}]: ${} #{} for {}{R}",
                             contentRec.bidvalArr[i],
                             tokenId2Str(contentRec.tokensArr[i]),
-                            scoutList[i]
+                            scout
                         );
                     }
                 } else {
@@ -328,9 +329,11 @@ impl Contract {
             }
         }
     }
+
     pub fn showContentList(&self) {
         self._showContentList(false)
     }
+
     pub fn showContentListWithBidding(&self) {
         self._showContentList(true)
     }
@@ -372,9 +375,9 @@ impl Contract {
 
     fn emit_content_bid(&self, contentKey: &ContentKey) {
         let contentRef: &ContentRec = &self.contents[&contentKey.key];
-        let mut json = String::from(format!("EVENT_JSON:{{\"event\": \"content_bid\", \"data\": {{\"content_id\": \"{}\", \"bids\": [", contentKey.key));
+        let mut json = format!("EVENT_JSON:{{\"event\": \"content_bid\", \"data\": {{\"content_id\": \"{}\", \"bids\": [", contentKey.key);
 
-        let aggMap: HashMap<String, (i32, f32)> = self.get_content_owners_pts_vals(&contentKey);
+        let aggMap: HashMap<String, (i32, f32)> = self.get_content_owners_pts_vals(contentKey);
         let date = 1270000000;
         let mut comma = "";
         for (owner, ptval) in &aggMap {
@@ -385,35 +388,24 @@ impl Contract {
             ));
             comma = ",";
         }
-        json.push_str(&"]}}");
+        json.push_str("]}}");
         log!("{}", json);
     }
 
     fn emit_content_licensing(&self, contentKey: &ContentKey, scoutId: &str, val: f32) {
         let contentRef: &ContentRec = &self.contents[&contentKey.key];
-        log!(format!("EVENT_JSON:{{\"event\": \"content_licensing\", \"data\": {{\"content_id\": \"{}\", \"licence\": {{\"buyer\": \"{}\", \"price\": {} }} }} }}", contentKey.key, scoutId, val));
+        log!("EVENT_JSON:{{\"event\": \"content_licensing\", \"data\": {{\"content_id\": \"{}\", \"licence\": {{\"buyer\": \"{}\", \"price\": {} }} }} }}", contentKey.key, scoutId, val);
     }
 
     fn emit_transfer_funds(&self, msg: &str, from: &str, to: &str, val: f32) {
         // let fmt = String::from(r#"EVENT_JSON:{{"event": "transfer_funds", "data": {{"from": "{}", "to": "{}" "value": "{}"}}"#);
         // log!(format!(fmt, from, to, val));
         //.rem  Rust is hell
-        log!(format!("EVENT_JSON:{{\"event\": \"transfer_funds\", \"data\": {{\"from\": \"{}\", \"to\": \"{}\" \"value\": \"{}\"}} }}", env::signer_account_id(), to, val));
+        log!("EVENT_JSON:{{\"event\": \"transfer_funds\", \"data\": {{\"from\": \"{}\", \"to\": \"{}\" \"value\": \"{}\"}} }}", env::signer_account_id(), to, val);
         //.fix: no from param needed, it's always the signer
     }
 
     // int basic content ops
-
-    fn create_empty_content_rec() -> ContentRec {
-        ContentRec {
-            contentId: String::from(""),
-            creatorId: String::from(""),
-            timestamp: 0,
-            bidvalArr: [0.0; BIDPT],
-            tokensArr: [0; BIDPT],
-            tokenId: 0,
-        }
-    }
 
     fn create_content_key(contentId: &str, creatorId: &str, timestamp: u64) -> ContentKey {
         ContentKey {
@@ -429,10 +421,10 @@ impl Contract {
             creatorId: contentKey.creatorId.clone(),
             contentId: contentKey.contentId.clone(),
             timestamp: contentKey.timestamp,
-            ..Self::create_empty_content_rec()
+            ..ContentRec::default()
         };
         self.contents.insert(contentKey.key.clone(), content);
-        self.create_content_nfts(&contentKey);
+        self.create_content_nfts(contentKey);
     }
 
     fn get_content_or_none(&self, contentKey: &ContentKey) -> Option<&ContentRec> {
@@ -448,12 +440,12 @@ impl Contract {
     // rem NFT methods
 
     fn get_next_tokenid(&mut self) -> usize {
-        self.lastTokenId = self.lastTokenId + 100;
+        self.lastTokenId += 100;
         self.lastTokenId
     }
 
     fn get_next_licence_tokenid(&mut self) -> usize {
-        self.lastContentTokenId = self.lastContentTokenId + 1;
+        self.lastContentTokenId += 1;
         self.lastContentTokenId
     }
 
@@ -529,7 +521,7 @@ impl Contract {
         for i in 1..(BIDPT + 1) {
             self.create_content_nft(contentKey, tokenIdRef + i, 1);
         }
-        let mut contentRec: &mut ContentRec = self.get_content_by_key_unguarded(&contentKey);
+        let mut contentRec: &mut ContentRec = self.get_content_by_key_unguarded(contentKey);
         contentRec.tokenId = tokenIdRef;
         let mut ret = [0; BIDPT];
         for i in 0..BIDPT {
@@ -544,8 +536,8 @@ impl Contract {
 
     pub fn get_nft_owners_for(&self, tokensArr: [usize; BIDPT]) -> [String; BIDPT] {
         let mut ret: [String; BIDPT] = Default::default();
-        let mut i = 0;
-        for tokenId in tokensArr {
+
+        for (i, &tokenId) in tokensArr.iter().enumerate() {
             let token_id = tokenId2Str(tokenId);
             let nft = match self.tokens.nft_token(token_id.clone()) {
                 //.fix: should fail here
@@ -562,7 +554,6 @@ impl Contract {
             //.rem: temp  log!("get_nft_owners_for #{}: {FgCyan}{} {R}", nft.token_id, &owner_id);
 
             ret[i] = owner_id;
-            i = i + 1;
         }
         ret
     }
@@ -581,30 +572,31 @@ impl Contract {
     }
 
     fn confirm_content_by_key(&mut self, contentKey: &ContentKey) -> bool {
-        if let Some(content) = self.get_content_or_none(&contentKey) {
+        if let Some(content) = self.get_content_or_none(contentKey) {
             log!(
                 "{FgLime}confirm_content: INFO contentKey found on 1st try! {}{R}",
                 contentKey.key
             );
             return true;
-        } else {
+        }
+
+        log!(
+            "{FgA}confirm_content: WARNING contentKey not found! Creating... {}{R}",
+            contentKey.key
+        );
+        self.create_new_content(contentKey);
+        if let Some(content2) = self.get_content_or_none(contentKey) {
             log!(
-                "{FgA}confirm_content: WARNING contentKey not found! Creating... {}{R}",
+                "{FgLime}confirm_content: INFO contentKey found on 2nd try! {}{R}",
                 contentKey.key
             );
-            self.create_new_content(&contentKey);
-            if let Some(content2) = self.get_content_or_none(&contentKey) {
-                log!(
-                    "{FgLime}confirm_content: INFO contentKey found on 2nd try! {}{R}",
-                    contentKey.key
-                );
-            } else {
-                log!(
-                    "{FgRed}confirm_content: ERROR contentKey not found after 2nd try! {}{R}",
-                    contentKey.key
-                );
-            }
+        } else {
+            log!(
+                "{FgRed}confirm_content: ERROR contentKey not found after 2nd try! {}{R}",
+                contentKey.key
+            );
         }
+
         false
     }
 
@@ -619,7 +611,7 @@ impl Contract {
     }
 
     fn get_content_by_key(&self, contentKey: &ContentKey) -> &ContentRec {
-        let someContent = self.get_content_or_none(&contentKey);
+        let someContent = self.get_content_or_none(contentKey);
         assert!(
             someContent.is_some(),
             "get_content ERROR: not found {}",
@@ -654,7 +646,7 @@ impl Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
-        let vec: Vec<&str> = msg.split(":").collect();
+        let vec: Vec<&str> = msg.split(':').collect();
 
         //.chk  len require
         //.chk  amount vs transferred coto
@@ -731,7 +723,7 @@ impl Contract {
             );
             false
         } else {
-            self.lock = self.lock + 1; //.rem: MUTEX start
+            self.lock += 1; //.rem: MUTEX start
             log!("{pre}{FgRed} LOCKED ({}).{R}", self.lock);
             true
         }
@@ -739,7 +731,7 @@ impl Contract {
 
     fn lock_end(&mut self, pre: &str) {
         //.rem: end locking mechanism
-        self.lock = self.lock - 1; //.rem: MUTEX end
+        self.lock -= 1; //.rem: MUTEX end
         log!("{pre}{FgRed} UNLOCKED ({}).{R}", self.lock);
     }
 
@@ -776,8 +768,8 @@ impl Contract {
         //.rem: destructuring original content
 
         let bidvalArrOrig = contentRef.bidvalArr;
-        let mut bidvalArrNew = bidvalArrOrig.clone();
-        let mut tokensArr = contentRef.tokensArr.clone();
+        let mut bidvalArrNew = bidvalArrOrig;
+        let mut tokensArr = contentRef.tokensArr;
         let creatorId = contentRef.creatorId.clone();
         let contentId = contentRef.contentId.clone();
 
@@ -815,8 +807,8 @@ impl Contract {
                                                                      // log!("->pay_creator");
                 self.pay_creator(&creatorId, creatorRefund); // never zero, no need for if
 
-                remainingBids = remainingBids - 1;
-                usedUpValue = usedUpValue + bidLimit;
+                remainingBids -= 1;
+                usedUpValue += bidLimit;
                 log!("{pre} {FgZ}->Percent slot won: %[{bix}] (NFT: {} -> {}) remaining: {} usedUpVal: {} gasUsed: {} {R}",
           "scoutIdOld", scoutId, remainingBids, usedUpValue, env::used_gas().0 / 1_000_000_000);
             }
@@ -831,7 +823,7 @@ impl Contract {
                 scoutId
             );
             //Promise::new(String::from(&scoutId).parse().unwrap()).transfer(refund);
-            self.transfer_funds(&"selfRefund", &scoutId, refund);
+            self.transfer_funds("selfRefund", &scoutId, refund);
             self.emit_transfer_funds("self_refund", &scoutId, &scoutId, selfRefund);
         } else {
             log!("{FgCyan}Successful bid, all funds used up.{}", R);
@@ -892,7 +884,7 @@ impl Contract {
 
     fn addToAgg(&self, ownerId: String, pt: i32, aggMap: &mut HashMap<String, i32>) {
         let rust1 = ownerId.clone();
-        let rust2 = ownerId.clone();
+        let rust2 = ownerId;
         let oldpt = aggMap.get(&rust1).unwrap_or(&0);
         let newpt = oldpt + pt;
         aggMap.remove(&rust2);
@@ -942,7 +934,7 @@ impl Contract {
         aggMap: &mut HashMap<String, (i32, f32)>,
     ) {
         let rust1 = ownerId.clone();
-        let rust2 = ownerId.clone();
+        let rust2 = ownerId;
         let oldptval = aggMap.get(&rust1).unwrap_or(&(0, 0.0));
         let newptval = (oldptval.0 + pt, oldptval.1 + val);
         aggMap.remove(&rust2);
@@ -950,7 +942,7 @@ impl Contract {
     }
 
     fn get_content_owners_internal(&self, content: &ContentRec) -> HashMap<String, (i32, f32)> {
-        let tokensArr = content.tokensArr.clone();
+        let tokensArr = content.tokensArr;
         let bidvalArr = &content.bidvalArr;
         let bidderArr: [String; BIDPT] = self.get_nft_owners_for(tokensArr);
 
@@ -971,7 +963,7 @@ impl Contract {
     //.fix  make it pub -> contentKey cannot be ref
 
     fn get_content_owners_pts_vals(&self, contentKey: &ContentKey) -> HashMap<String, (i32, f32)> {
-        let someContent = self.get_content_or_none(&contentKey);
+        let someContent = self.get_content_or_none(contentKey);
         require!(
             someContent.is_some(),
             format!("No content found with key {}", contentKey.key)
@@ -1018,7 +1010,7 @@ impl Contract {
             let mut sum = 0.0;
             let bidvalArr = content.bidvalArr;
             for i in 0..BIDPT {
-                sum = sum + bidvalArr[i];
+                sum += bidvalArr[i];
             }
             //3.0 * sum
             1.0 * sum
@@ -1030,7 +1022,7 @@ impl Contract {
             format!("Price ({price}) must be >= minimum price {sum}")
         );
 
-        let tokensArr = content.tokensArr.clone();
+        let tokensArr = content.tokensArr;
         // log!("{:#?}", tokensArr);
         let aggMap: HashMap<String, i32> =
             self.get_content_owners_from_arr_internal(tokensArr, creatorId);
@@ -1087,7 +1079,7 @@ impl Contract {
         let account_id = self
             .tokens
             .owner_by_id
-            .get(&token_id)
+            .get(token_id)
             .unwrap_or_else(|| env::panic_str(&format!("Token {} not found", token_id)));
 
         let refund = (scoutRefund * 1E24) as u128;
@@ -1099,7 +1091,7 @@ impl Contract {
         let accountId = &account_id.to_string(); // &String::from(&account_id);
         Promise::new(account_id).transfer(refund);
         //self.emit_transfer_funds("scout_payback", accountId, &accountId, scoutRefund);
-        self.emit_transfer_funds("scout_payback", accountId, &accountId, scoutRefund);
+        self.emit_transfer_funds("scout_payback", accountId, accountId, scoutRefund);
     }
     // let amount: u128 = 1_000_000_000_000_000_000_000_000; // 1 $NEAR as yoctoNEAR
 
@@ -1115,14 +1107,14 @@ impl Contract {
         );
 
         //Promise::new(creator_id).transfer(refund * 9 / 10);
-        self.transfer_funds(&"payCreator", creatorId, refund * 9 / 10);
+        self.transfer_funds("payCreator", creatorId, refund * 9 / 10);
 
-        self.emit_transfer_funds("bid_creator", &creatorId, &creatorId, creatorRefund * 0.9);
+        self.emit_transfer_funds("bid_creator", creatorId, creatorId, creatorRefund * 0.9);
 
         //Promise::new(String::from(TREASURY_ID).parse().unwrap()).transfer(refund * 1 / 10);
-        self.transfer_funds(&"payCreator", TREASURY_ID, refund * 1 / 10);
+        self.transfer_funds("payCreator", TREASURY_ID, refund / 10);
 
-        self.emit_transfer_funds("bid_share", &creatorId, &creatorId, creatorRefund * 0.1);
+        self.emit_transfer_funds("bid_share", creatorId, creatorId, creatorRefund * 0.1);
     }
 
     // rem general_pay_near
@@ -1132,7 +1124,7 @@ impl Contract {
         let account_id: AccountId = String::from(accountId).parse().unwrap();
         // log!("--general_pay_near: ->{} amount: {H}{}{R} NEAR", accountId, near);
         Promise::new(account_id).transfer(yoctoNear);
-        self.emit_transfer_funds("general", &accountId, &accountId, near); //.fix: not here
+        self.emit_transfer_funds("general", accountId, accountId, near); //.fix: not here
     }
 
     // rem modded version of internal_transfer (no approvals, no event log)
@@ -1144,7 +1136,7 @@ impl Contract {
         #[allow(clippy::ptr_arg)] token_id: &TokenId,
     ) {
         self.tokens
-            .internal_transfer_unguarded(token_id, &sender_id, receiver_id);
+            .internal_transfer_unguarded(token_id, sender_id, receiver_id);
         // NonFungibleToken::emit_transfer(&owner_id, receiver_id, token_id, sender_id, memo);
     }
 
@@ -1164,7 +1156,7 @@ impl Contract {
         // self.tokens.internal_transfer(&sender_id, &receiver_id, token_id, None, None);
         // self.internal_transfer_mod(&sender_id, &receiver_id, token_id);
         self.tokens
-            .internal_transfer_unguarded(token_id, &sender_id, &receiver_id);
+            .internal_transfer_unguarded(token_id, &sender_id, receiver_id);
     }
 
     // rem one method for calling both transfer & reimbursement steps
@@ -1184,7 +1176,7 @@ impl Contract {
         } else {
             log!("rebid: 1st bid, no reimbursement.");
         }
-        self.nft_transfer_mod(token_id, &biddingScoutId);
+        self.nft_transfer_mod(token_id, biddingScoutId);
     }
 
     // debug / test methods
@@ -1304,7 +1296,7 @@ mod tests {
     fn test_new() {
         let mut context = get_context(accounts(1));
         testing_env!(context.build());
-        let contract = Contract::new_default_meta(accounts(1).into());
+        let contract = Contract::new_default_meta(accounts(1));
         testing_env!(context.is_view(true).build());
         assert_eq!(contract.nft_token("1".to_string()), None);
     }
@@ -1321,7 +1313,7 @@ mod tests {
     fn test_mint() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(0).into());
+        let mut contract = Contract::new_default_meta(accounts(0));
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -1341,7 +1333,7 @@ mod tests {
     fn test_transfer() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(0).into());
+        let mut contract = Contract::new_default_meta(accounts(0));
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -1378,7 +1370,7 @@ mod tests {
     fn test_approve() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(0).into());
+        let mut contract = Contract::new_default_meta(accounts(0));
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -1402,14 +1394,14 @@ mod tests {
             .is_view(true)
             .attached_deposit(0)
             .build());
-        assert!(contract.nft_is_approved(token_id.clone(), accounts(1), Some(1)));
+        assert!(contract.nft_is_approved(token_id, accounts(1), Some(1)));
     }
 
     #[test]
     fn test_revoke() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(0).into());
+        let mut contract = Contract::new_default_meta(accounts(0));
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -1440,14 +1432,14 @@ mod tests {
             .is_view(true)
             .attached_deposit(0)
             .build());
-        assert!(!contract.nft_is_approved(token_id.clone(), accounts(1), None));
+        assert!(!contract.nft_is_approved(token_id, accounts(1), None));
     }
 
     #[test]
     fn test_revoke_all() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(0).into());
+        let mut contract = Contract::new_default_meta(accounts(0));
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -1478,6 +1470,6 @@ mod tests {
             .is_view(true)
             .attached_deposit(0)
             .build());
-        assert!(!contract.nft_is_approved(token_id.clone(), accounts(1), Some(1)));
+        assert!(!contract.nft_is_approved(token_id, accounts(1), Some(1)));
     }
 }
