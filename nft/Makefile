@@ -9,3 +9,6 @@ lint:
 
 test:
 	@cargo test -- --nocapture
+
+coverage:
+	@cargo tarpaulin --target-dir target-tarpaulin

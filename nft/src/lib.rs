@@ -32,7 +32,7 @@ use near_sdk::{
     collections::LazyOption,
     env, ext_contract,
     json_types::{Base64VecU8, U128},
-    log, near_bindgen, require,
+    near_bindgen, require,
     serde_json::json,
     utils::assert_one_yocto,
     AccountId, BorshStorageKey, Gas, PanicOnDefault, Promise, PromiseOrValue,
@@ -40,6 +40,19 @@ use near_sdk::{
 
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::collections::HashMap;
+
+const DEBUG_LOG: bool = true;
+
+#[macro_export]
+macro_rules! log {
+  ($($arg:tt)*) => {
+    if DEBUG_LOG {
+      println!($($arg)*);
+    } else {
+      near_sdk::log!(format!($($arg)*).as_str());
+    }
+  };
+}
 
 // pub mod external;
 // pub use crate::external::*;
@@ -58,10 +71,10 @@ pub trait ExtSelf {
     //fn on_buy_service(service_id: u64) -> Service;
 }
 
-const BIDPT: usize = 10;
+const BIDPT: usize = 20;
 const E24: u128 = 1_000_000_000_000_000_000_000_000;
 const TREASURY_ID: &str = "botticelli.testnet";
-const defaultTokenMetadata: TokenMetadata = TokenMetadata {
+const DEFAULT_TOKEN_METADATA: TokenMetadata = TokenMetadata {
     title: None,
     description: None,
     extra: None,
@@ -212,7 +225,7 @@ impl Contract {
             "{}****Classic new is called for {}********{}",
             FgOrange,
             env::current_account_id(),
-            R
+            R,
         );
 
         assert!(!env::state_exists(), "Already initialized");
@@ -470,7 +483,7 @@ impl Contract {
             description: None,
             extra: Some(extra),
             media: Some(url),
-            ..defaultTokenMetadata
+            ..DEFAULT_TOKEN_METADATA
         });
         //self.tokens.internal_mint(tokenIdStr, receiverId, token_metadata);
         //.rem  calling non-standard minting method:
@@ -499,7 +512,7 @@ impl Contract {
             description: None,
             extra: Some(extra),
             media: Some(url),
-            ..defaultTokenMetadata
+            ..DEFAULT_TOKEN_METADATA
         });
         //self.tokens.internal_mint(tokenIdStr, receiverId, token_metadata);
         //.rem  calling non-standard minting method:
@@ -628,11 +641,8 @@ impl Contract {
     ) -> &ContentRec {
         let contentKey = Self::create_content_key(&contentId, &creatorId, timestamp);
         let contentRef: Option<&ContentRec> = self.contents.get(&contentKey.key);
-        return if contentRef.is_some() {
-            contentRef.unwrap()
-        } else {
-            &self.emptyContentRec
-        };
+
+        contentRef.unwrap_or(&self.emptyContentRec)
     }
 
     //.pub  COTO transfer listener
@@ -1471,5 +1481,53 @@ mod tests {
             .attached_deposit(0)
             .build());
         assert!(!contract.nft_is_approved(token_id, accounts(1), Some(1)));
+    }
+
+    #[test]
+    fn test_ft_on_transfer() {
+        let mut context = get_context(accounts(0));
+
+        testing_env!(context.build());
+
+        let mut contract = Contract::new_default_meta(accounts(0));
+
+        assert!(contract.contents.is_empty());
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(0))
+            .build());
+
+        const NFT_ID: &str = "85d491b3-18f8-40f6-be33-b83dd749a8a4:creator.testnet:123367777";
+        const EXAMPLE_BID: &str =
+            "bid:creator.testnet:85d491b3-18f8-40f6-be33-b83dd749a8a4:123367777:10:22.5:";
+        const PT: i32 = 10;
+        const COTO_VALUE: f32 = 22.5;
+
+        let res = contract.ft_on_transfer(accounts(0), U128::from(100000_u128), EXAMPLE_BID.into());
+
+        match res {
+            PromiseOrValue::Promise(_) => panic!("Expected PromiseOrValue::Value"),
+            PromiseOrValue::Value(value) => {
+                assert_eq!(value, U128::from(0));
+            }
+        }
+
+        assert!(!contract.contents.is_empty());
+
+        contract.contents.iter().for_each(|(k, v)| {
+            println!("{}: {:?}", k, v);
+        });
+
+        let content = contract.contents.get(NFT_ID).unwrap();
+
+        assert_eq!(content.bidvalArr.len(), 20);
+        assert_eq!(content.tokensArr.len(), 20);
+
+        let (left, right) = content.bidvalArr.split_at(10);
+
+        assert_eq!(left, vec![0.0_f32; 10]);
+        assert_eq!(right, vec![COTO_VALUE / PT as f32; 10].as_slice());
     }
 }

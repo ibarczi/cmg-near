@@ -11,3 +11,10 @@ crate-type = ["cdylib", "rlib"]
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
 serde = "1.0.0"
+
+# [dev-dependencies]
+# workspaces = "0.5.0"
+# tokio = { version = "1.21.1", default_features = false, features = [
+#     "rt",
+#     "macros",
+# ] }
